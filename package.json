@@ -1,0 +1,58 @@
+{
+  "name": "dsh-sidebar-shelf",
+  "version": "0.1.0",
+  "description": "Collapse every DSH left-sidebar panel entry into one clean, searchable shelf — open a panel only when you need it.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "locale",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "icon.svg"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "sidebar",
+    "ui",
+    "cordis"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wumouren114/dsh-sidebar-shelf.git"
+  },
+  "homepage": "https://github.com/wumouren114/dsh-sidebar-shelf#readme",
+  "bugs": {
+    "url": "https://github.com/wumouren114/dsh-sidebar-shelf/issues"
+  },
+  "icon": "./icon.svg",
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "slots",
+        "layout",
+        "locale"
+      ]
+    }
+  }
+}

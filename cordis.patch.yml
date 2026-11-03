@@ -1,0 +1,10 @@
+# dsh-sidebar-shelf bundle patch
+#
+# 把插件的 Loader 行插进 profile 的配置树。
+# Node 半侧（lib/index.js）只满足 bundle 契约；全部行为都在浏览器半侧
+# lib/client.js —— 它通过 package.json 的 dsh.client 被模块系统扫描、按需加载。
+#
+# id 必须全局唯一，且与包名一致；这一行不要写行尾注释。
+- insert:
+    - id: dsh-sidebar-shelf
+      name: 'dsh-sidebar-shelf'

@@ -1,0 +1,4 @@
+node_modules/
+.shelf-chrome-profile/
+*.tgz
+.DS_Store
