@@ -18,6 +18,7 @@ DSH Web / 桌面端的左侧栏从上到下是：品牌行 → **新会话** →
 `dsh-sidebar-shelf` 把**所有面板入口**收成同一列里的一行——就在工作区正上方，想用哪个再展开。
 
 - **一行就在原面板列表的位置**：宽度、间距、悬浮态都和原生面板行一致，工作区直接上移。
+- **收养外部入口**：绕过槽位、直接往侧栏根节点插行的插件（`dsh-webchat`、taskboard、ssh 使用的 `data-dsh-*-entry` 约定）也会被隐藏并放进同一个收纳架，图标、名字、激活态都跟随原入口；点它时触发原按钮自己的点击，开关逻辑照旧。
 - **用的是原生行**，不是自绘按钮：外壳自己的按钮、56px 轨道形态、Tooltip 都沿用，只隐藏它的兄弟行。
 - **两列面板架**，每个面板用它自己注册的图标。
 - **面板超过 7 个自动出现搜索框**。
@@ -65,15 +66,16 @@ DSH 的左侧栏由 `@deepseek-ai/dsh-client-ui-sidebar` 拥有。第三方插�
 
 1. 在 `sidebar.panellist` 注册自己的一行（`id: dsh-sidebar-shelf-entry`、`order: -1000`、label `面板` / `Panels`）；
 2. 从图标向上找到外壳的面板行按钮，打标记，并挂捕获阶段的 click 处理器——既打开收纳架，也阻止外壳对一个没有主面板的 id 调用 `selectPanel`；
-3. 用一条作用域受限的规则隐藏兄弟行：`[data-dsh-shelf="on"] > *:not([data-dsh-shelf-row]) { display: none !important }`——列表元素本身保持挂载，所以这一行保留外壳原生的位置、间距和轨道几何；
-4. 读 `ctx.slots.entriesOfSlot("sidebar.panellist")` 作为收纳架内容，复刻侧栏自己的排序（`order`，再按注册顺序），每格直接用面板**自己注册的图标组件**（外层错误边界，失败时退回首字母）；
-5. 选中格子时调用 `ctx.layout.selectPanel(id)`。
+3. 用一条作用域受限的规则隐藏兄弟行：`[data-dsh-shelf="on"] > nav > *:not([data-dsh-shelf-row]) { display: none !important }`——列表元素本身保持挂载，所以这一行保留外壳原生的位置、间距和轨道几何；
+4. 同时观察侧栏根节点里由其它插件注入的行（`data-dsh-*-entry`），原地隐藏并放到收纳架最前面，图标、标签、`data-active` 激活态都跟随原行；点它时触发原行自己的 `click()`；
+5. 读 `ctx.slots.entriesOfSlot("sidebar.panellist")` 作为收纳架其余内容，复刻侧栏自己的排序（`order`，再按注册顺序），每格直接用面板**自己注册的图标组件**（外层错误边界，失败时退回首字母）；
+6. 选中已注册面板时调用 `ctx.layout.selectPanel(id)`。
 
 其它什么都不碰：不动工作区、品牌行、设置，不加宿主行为，也不改 DSH 的任何文件。插件卸载时标记、监听与样式一并移除，原生面板列自动回来。
 
 ## 已验证
 
-- DSH `0.2.1-rc.3` / Windows / Chromium 1440×900 —— 18/18 端到端检查：入口位于工作区上方、只隐藏兄弟行、搜索、键盘、切换面板、当前标记、Esc、56px 轨道、暗色主题、无页面报错。
+- DSH `0.2.1-rc.3` / Windows / Chromium 1440×900 —— 23/23 端到端检查：入口位于工作区上方、只隐藏兄弟行、搜索、键盘、切换面板、当前标记、Esc、收养 DOM 注入的 `data-dsh-*-entry` 行（原地隐藏、排在最前、原点击处理器仍执行、激活态同步）、56px 轨道、暗色主题、无页面报错。
 - `node test/smoke.mjs` —— 10 项清单 / bundle / 接线检查，零依赖。
 
 上面的截图由 `test/e2e.cjs` 在一次性测试 profile 里产生；截图里的面板来自仅用于测试的 fixture（`test/demo-panels`），不随包发布。
@@ -81,6 +83,7 @@ DSH 的左侧栏由 `@deepseek-ai/dsh-client-ui-sidebar` 拥有。第三方插�
 ## 已知限制
 
 - **其它面板行全部隐藏**，包括外壳自带的「更多」菜单（浏览更多插件 / 创建你的插件）。「插件」面板仍在收纳架里一步可达。
+- **只有遵循 `data-dsh-*-entry` 约定的注入行会被收养**（`dsh-webchat`、taskboard、ssh 都是）。不按这个约定插行的插件仍会留在侧栏里。
 - 一个插件只做一件事：暂时没有「固定某几个面板留在侧栏」的策略。需要的话请开 issue，这是下一步最自然的方向。
 - 不要和另一个同样隐藏该列表的插件（如 `dsh-toomuch-plugins`、`dsh-sidebar-organizer`）同时使用，二选一。
 - DOM 契约是列表里那枚外壳面板行按钮。如果未来 DSH 改了结构，最坏情况是列表没被隐藏，而不会把侧栏弄坏。

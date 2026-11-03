@@ -18,6 +18,7 @@ The DSH Web/desktop sidebar stacks its brand row, **New Session**, **every globa
 `dsh-sidebar-shelf` folds **all panel entries** into a single row in that same column, right above the workspace, and brings any panel back on demand.
 
 - **One row where the panel list was.** Same place, same width, same spacing as a native panel row — the workspace moves straight up under it.
+- **Adopts injected entries.** Plugins that bypass the slot and inject a row straight into the sidebar (the `data-dsh-*-entry` convention used by `dsh-webchat`, taskboard and ssh) are hidden in place and listed in the same shelf with their own icon, label and active state; choosing one clicks their own button, so their toggle keeps working.
 - **A native row, not a fake one.** The shell's own button, hover state, 36px rail form and tooltip are reused; only the sibling rows are hidden.
 - **A 2-column shelf** with each panel's own registered icon.
 - **Search** appears once there are more than seven panels.
@@ -65,15 +66,16 @@ Concretely, `lib/client.js`:
 
 1. registers its own `sidebar.panellist` entry (`id: dsh-sidebar-shelf-entry`, `order: -1000`, label `面板` / `Panels`);
 2. from its glyph walks to the shell's row button, marks it, and attaches a capture-phase click handler — this both opens the shelf and stops the shell from calling `selectPanel` on an id that has no main panel;
-3. hides the sibling rows with one scoped rule: `[data-dsh-shelf="on"] > *:not([data-dsh-shelf-row]) { display: none !important }` — the list element itself stays mounted, so the row keeps the shell's native position, spacing and rail geometry;
-4. reads `ctx.slots.entriesOfSlot("sidebar.panellist")` for the shelf contents, mirrors the sidebar's own sort (`order`, then registration order), and renders each panel's **own** icon component (wrapped in an error boundary that falls back to an initial);
-5. calls `ctx.layout.selectPanel(id)` when a tile is chosen.
+3. hides the sibling rows with one scoped rule: `[data-dsh-shelf="on"] > nav > *:not([data-dsh-shelf-row]) { display: none !important }` — the list element itself stays mounted, so the row keeps the shell's native position, spacing and rail geometry;
+4. also watches the sidebar root for rows injected by other plugins (`data-dsh-*-entry`), hides them in place and lists them at the top of the shelf with their own icon, label and `data-active` state; choosing one calls that row's own `click()`;
+5. reads `ctx.slots.entriesOfSlot("sidebar.panellist")` for the remaining shelf contents, mirrors the sidebar's own sort (`order`, then registration order), and renders each panel's **own** icon component (wrapped in an error boundary that falls back to an initial);
+6. calls `ctx.layout.selectPanel(id)` when a registered panel tile is chosen.
 
 Nothing else is touched: no workspace rows, no brand row, no Settings, no host-side behavior, no DSH files. Unmounting the plugin removes the marker, the handler and the stylesheet, and the native rows come back.
 
 ## Verified
 
-- DSH `0.2.1-rc.3`, Windows, Chromium 1440×900 — 18/18 end-to-end checks: placement above the workspace, sibling-only hiding, search, keyboard, panel switching, active marker, Escape, 56px rail, dark theme, no page errors.
+- DSH `0.2.1-rc.3`, Windows, Chromium 1440×900 — 23/23 end-to-end checks: placement above the workspace, sibling-only hiding, search, keyboard, panel switching, active marker, Escape, adoption of a DOM-injected `data-dsh-*-entry` row (hidden in place, listed first, own click handler runs, active state reflected), 56px rail, dark theme, no page errors.
 - `node test/smoke.mjs` — 10 manifest/bundle/wiring checks, no dependencies.
 
 The screenshots above were produced by `test/e2e.cjs` against a throwaway profile; the panels in them come from a test-only fixture (`test/demo-panels`), not from shipped code.
@@ -81,6 +83,7 @@ The screenshots above were produced by `test/e2e.cjs` against a throwaway profil
 ## Known limitations
 
 - **Every other panel row is hidden**, including the shell's own "More" menu (`Browse other plugins` / `Create your plugin`). The Plugins panel is still one click away in the shelf.
+- **Injected rows are adopted only when they follow the `data-dsh-*-entry` convention** (as `dsh-webchat`, taskboard and ssh do). A plugin that injects a row without that marker stays in the sidebar.
 - One plugin, one job: there is no per-panel pin/hide policy yet. If you need "keep these three in the sidebar", say so in an issue — it is the natural next step.
 - Do not pair it with another plugin that hides the same list (e.g. `dsh-toomuch-plugins`, `dsh-sidebar-organizer`); pick one.
 - The DOM contract is the shell's panel-row button inside the list. If a future DSH release changes that structure, the worst case is an un-hidden list, never a broken sidebar.

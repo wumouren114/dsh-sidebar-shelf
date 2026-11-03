@@ -86,7 +86,7 @@ async function dismissDialogs(page) {
     };
   });
   check('shelf opens from the native row', opened.found);
-  check('shelf lists every panel', opened.tileCount === 12, `${opened.tileCount} tiles`);
+  check('shelf lists every panel', opened.tileCount === 13, `${opened.tileCount} tiles`);
   check('card opens under the row', opened.popBox !== null && opened.popBox.top >= opened.rowBox.bottom);
   check('search appears for many panels', opened.search);
   await page.screenshot({ path: path.join(outDir, '02-shelf-open.png') });
@@ -125,6 +125,38 @@ async function dismissDialogs(page) {
   await page.keyboard.press('Escape');
   await sleep(250);
   check('Escape closes the shelf', await page.evaluate(() => document.querySelector('.dshs-pop') === null));
+
+  // 5b. DOM-injected sidebar rows (dsh-webchat convention) are adopted
+  const external = await page.evaluate(() => {
+    const el = document.querySelector('[data-dsh-demo-entry]');
+    return { found: Boolean(el), display: el ? getComputedStyle(el).display : null };
+  });
+  check('DOM-injected row is adopted and hidden in place', external.found && external.display === 'none', JSON.stringify(external));
+
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
+  await sleep(400);
+  const externalTile = await page.evaluate(() => {
+    const first = document.querySelector('.dshs-tile');
+    return { title: first?.getAttribute('title'), count: document.querySelectorAll('.dshs-tile').length };
+  });
+  check('adopted row is listed first in the shelf', externalTile.title === '网页聊天', JSON.stringify(externalTile));
+
+  await page.evaluate(() => document.querySelector('.dshs-tile').click());
+  await sleep(500);
+  const afterExternal = await page.evaluate(() => ({
+    clicks: window.__demoEntryClicks ?? 0,
+    active: document.querySelector('[data-dsh-demo-entry]')?.getAttribute('data-active'),
+    pop: Boolean(document.querySelector('.dshs-pop')),
+  }));
+  check('adopted row keeps its own click handler', afterExternal.clicks === 1, JSON.stringify(afterExternal));
+  check('choosing an adopted row closes the shelf', afterExternal.pop === false);
+
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
+  await sleep(400);
+  const externalActive = await page.evaluate(() => document.querySelector('.dshs-tile[data-active="true"]')?.getAttribute('title'));
+  check('adopted row shows its active state', externalActive === '网页聊天', String(externalActive));
+  await page.keyboard.press('Escape');
+  await sleep(200);
 
   // 6. rail mode keeps the same native row, as a 36px icon
   await page.evaluate(() => {

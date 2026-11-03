@@ -71,6 +71,8 @@ check('client keeps one native panel row and hides the others', () => {
   assert.match(client, /entriesOfSlot\("sidebar\.panellist"\)/);
   assert.match(client, /ctx\.layout\.selectPanel/);
   assert.ok(client.includes('> *:not(['), 'must hide sibling rows, not the whole list');
+  assert.ok(client.includes('data-dsh-shelf-adopted'), 'must adopt data-dsh-*-entry rows');
+  assert.ok(client.includes('ENTRY_MARKER'), 'must recognize injected entry attributes');
   assert.ok(client.includes('closest("button")'), 'must attach to the native row button');
 });
 

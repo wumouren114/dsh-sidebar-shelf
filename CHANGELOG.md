@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 — 2026-11-03
+
+- **Adopt DOM-injected sidebar rows.** Plugins that bypass `sidebar.panellist` and inject a row into the sidebar root (the `data-dsh-*-entry` convention used by `dsh-webchat`, taskboard and ssh) are now hidden in place and listed at the top of the shelf with their own icon, label and `data-active` state. Choosing one calls that row's own `click()`, so its toggle/panel logic keeps working.
+- Stop clicks inside the portalled card from bubbling through the React tree into the shell's panel row (which had raised `layout.selectPanel: main panel "dsh-sidebar-shelf-entry" is not registered` after choosing a tile).
+- Test fixture now injects a fake `data-dsh-demo-entry` row; e2e grew to 23 checks covering adoption.
+
 ## 0.2.0 — 2026-11-03
 
 - **Moved the entry into the panel column**: the shelf is now a native `sidebar.panellist` row between New Session and the workspace, exactly where the panel list was — no more footer row.

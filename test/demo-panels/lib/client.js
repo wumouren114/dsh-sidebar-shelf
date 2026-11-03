@@ -1,5 +1,8 @@
 // Test-only fixture: registers realistic-looking panels (nav entry + main page)
 // so the shelf can be exercised without installing a pile of real plugins.
+// It also injects one sidebar row the way dsh-webchat does (a direct child of
+// the sidebar root carrying a `data-dsh-*-entry` attribute), so the shelf's
+// adoption path is covered.
 window.__ModuleLoader__.load({
 	id: "dsh-sidebar-shelf-demo-panels",
 	factory: (require) => {
@@ -41,9 +44,41 @@ window.__ModuleLoader__.load({
 			);
 		}
 
+		// Mimics dsh-webchat: a row inserted straight into the sidebar root, with
+		// its own click handler and `data-active` state.
+		function mountExternalEntry() {
+			let entry = null;
+			const ensure = () => {
+				if (entry !== null && entry.isConnected) return;
+				const nav = document.querySelector("nav");
+				const root = nav?.parentElement ?? null;
+				if (root === null) return;
+				entry = document.createElement("button");
+				entry.type = "button";
+				entry.setAttribute("data-dsh-demo-entry", "");
+				entry.style.cssText = "display:flex;align-items:center;gap:8px;height:36px;margin:0 2px 8px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;cursor:pointer;";
+				entry.innerHTML =
+					'<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 0 1 4.7 8.3L13.5 13.5l-2.8-.8A5.5 5.5 0 1 1 8 2.5z"/><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"/></svg><span>网页聊天</span>';
+				entry.addEventListener("click", () => {
+					window.__demoEntryClicks = (window.__demoEntryClicks ?? 0) + 1;
+					if (entry.getAttribute("data-active") === "true") entry.removeAttribute("data-active");
+					else entry.setAttribute("data-active", "true");
+				});
+				const newSession = root.querySelector('button[aria-label="新建会话"]');
+				const logoRow = newSession?.closest('[class*="logoRow"]') ?? null;
+				const anchor = logoRow !== null && logoRow.parentElement === root ? logoRow.nextElementSibling : null;
+				root.insertBefore(entry, anchor);
+			};
+			ensure();
+			const observer = new MutationObserver(ensure);
+			observer.observe(document.body, { childList: true, subtree: true });
+			return () => observer.disconnect();
+		}
+
 		const inject = ["slots"];
 
 		function apply(ctx) {
+			ctx.effect(() => mountExternalEntry(), "demo-panels: external sidebar entry");
 			for (const panel of PANELS) {
 				ctx.slots.inject("sidebar.panellist", () =>
 					ctx.slots.register(
