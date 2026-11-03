@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — 2026-11-03
+
+- **Moved the entry into the panel column**: the shelf is now a native `sidebar.panellist` row between New Session and the workspace, exactly where the panel list was — no more footer row.
+- Only sibling panel rows are hidden; the list element and our row keep the shell's own geometry, spacing, tooltip and 56px rail form.
+- Row clicks are intercepted in the capture phase, so the shell never selects a main panel that does not exist for the shelf id.
+- Rail shelf now opens beside the rail; the card drops directly under the row in wide mode.
+- Removed the footer trigger, count badge and the trigger's "active panel" mirroring (the shelf itself still marks the active panel).
+
 ## 0.1.0 — 2026-11-03
 
 First public release.

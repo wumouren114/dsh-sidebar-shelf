@@ -64,13 +64,14 @@ check('client requires only platform modules', () => {
   for (const name of required) assert.ok(allowed.has(name), `unexpected require("${name}")`);
 });
 
-check('client registers into the sidebar footer slot', () => {
+check('client keeps one native panel row and hides the others', () => {
   const client = read('lib/client.js');
-  assert.match(client, /ctx\.slots\.inject\("sidebar\.footer\.action"/);
-  assert.match(client, /name: "sidebar\.footer\.action"/);
+  assert.match(client, /ctx\.slots\.inject\("sidebar\.panellist"/);
+  assert.match(client, /name: "sidebar\.panellist"/);
   assert.match(client, /entriesOfSlot\("sidebar\.panellist"\)/);
   assert.match(client, /ctx\.layout\.selectPanel/);
-  assert.ok(client.includes('="on"] > nav'));
+  assert.ok(client.includes('> *:not(['), 'must hide sibling rows, not the whole list');
+  assert.ok(client.includes('closest("button")'), 'must attach to the native row button');
 });
 
 check('locales carry plugin-list metadata', () => {
@@ -94,7 +95,7 @@ check('published files include the runtime pieces', () => {
   }
 });
 
-check('apply() wires the footer slot and locale', () => {
+check('apply() wires the panel list slot and locale', () => {
   let factory;
   globalThis.window = {
     __ModuleLoader__: {
@@ -163,8 +164,10 @@ check('apply() wires the footer slot and locale', () => {
   exports.apply(ctx);
   assert.equal(registrations.length, 1);
   const [registration] = registrations;
-  assert.equal(registration.options.name, 'sidebar.footer.action');
-  assert.equal(registration.options.id, 'dsh-sidebar-shelf');
+  assert.equal(registration.options.name, 'sidebar.panellist');
+  assert.equal(registration.options.id, 'dsh-sidebar-shelf-entry');
+  assert.equal(registration.options.order, -1000);
+  assert.equal(typeof registration.options.label, 'function');
   assert.equal(typeof registration.component, 'function');
   const injected = registration.options.inject();
   assert.equal(typeof injected.selectPanel, 'function');

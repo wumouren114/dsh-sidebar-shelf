@@ -6,13 +6,25 @@ const puppeteer = require('puppeteer-core');
 
 const url = process.argv[2];
 const outDir = process.argv[3] || 'docs';
-const CHROME = 'C:\\Users\\38875\\AppData\\Local\\ms-playwright\\chromium-1248\\chrome-win64\\chrome.exe';
+const CHROME = process.env.DSH_SHOT_BROWSER || 'C:\\Users\\38875\\AppData\\Local\\ms-playwright\\chromium-1248\\chrome-win64\\chrome.exe';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok: Boolean(ok), detail });
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
+}
+
+async function dismissDialogs(page) {
+  // Onboarding and the sign-in prompt can appear one after the other.
+  for (let pass = 0; pass < 3; pass += 1) {
+    await page.evaluate(() => {
+      const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '继续');
+      if (btn) btn.click();
+      document.querySelector('[role="dialog"] button[aria-label="关闭"]')?.click();
+    });
+    await sleep(600);
+  }
 }
 
 (async () => {
@@ -32,50 +44,51 @@ function check(name, ok, detail) {
 
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
   await sleep(3500);
-  await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '继续');
-    if (btn) btn.click();
-  });
-  await sleep(700);
-  // A fresh profile also shows the "get started" dialog; close it so the
-  // screenshots show the real sidebar instead of a dimmed backdrop.
-  await page.evaluate(() => {
-    document.querySelector('[role="dialog"] button[aria-label="关闭"]')?.click();
-  });
-  await sleep(500);
+  await dismissDialogs(page);
 
-  // 1. native panel list hidden, shelf trigger present
+  // 1. the shelf owns the native row above the workspace pane
   const base = await page.evaluate(() => {
-    const nav = document.querySelector('nav');
-    const trigger = document.querySelector('.dshs-trigger');
+    const row = document.querySelector('[data-dsh-shelf-row]');
+    const nav = row?.parentElement ?? null;
+    const siblings = nav ? [...nav.children] : [];
+    const region = nav?.nextElementSibling ?? null;
+    const newSession = document.querySelector('button[aria-label="新建会话"]');
     return {
-      navDisplay: nav ? getComputedStyle(nav).display : 'missing',
-      marker: Boolean(document.querySelector('[data-dsh-shelf]')),
-      trigger: Boolean(trigger),
-      triggerText: trigger?.textContent ?? '',
+      rowFound: Boolean(row),
+      rowText: row ? row.textContent.trim() : null,
+      rowBox: row ? row.getBoundingClientRect().toJSON() : null,
+      navVisible: nav ? getComputedStyle(nav).display : 'missing',
+      navChildren: siblings.length,
+      visibleRows: siblings.filter((child) => getComputedStyle(child).display !== 'none').length,
+      regionTop: region ? region.getBoundingClientRect().top : null,
+      newSessionBottom: newSession ? newSession.getBoundingClientRect().bottom : null,
     };
   });
-  check('native panel list is collapsed', base.navDisplay === 'none', `display=${base.navDisplay}`);
-  check('sidebar root is marked', base.marker);
-  check('shelf trigger exists', base.trigger, base.triggerText);
-  await page.screenshot({ path: path.join(outDir, '01-collapsed.png') });
+  check('the shelf owns a native panel row', base.rowFound && base.rowText === '面板', base.rowText);
+  check('native list stays mounted, only siblings are hidden', base.navVisible !== 'none' && base.visibleRows === 1, `${base.visibleRows}/${base.navChildren} visible`);
+  check('row sits below New Session', base.rowBox !== null && base.rowBox.top > base.newSessionBottom, `${base.rowBox?.top} > ${base.newSessionBottom}`);
+  check('row sits above the workspace pane', base.rowBox !== null && base.rowBox.bottom <= base.regionTop, `${base.rowBox?.bottom} <= ${base.regionTop}`);
+  await page.screenshot({ path: path.join(outDir, '01-placement.png') });
 
   // 2. open the shelf
-  await page.evaluate(() => document.querySelector('.dshs-trigger').click());
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
   await sleep(400);
   const opened = await page.evaluate(() => {
+    const row = document.querySelector('[data-dsh-shelf-row]');
     const pop = document.querySelector('.dshs-pop');
     return {
       found: Boolean(pop),
-      tiles: pop ? [...pop.querySelectorAll('.dshs-tile')].map((t) => t.getAttribute('title')) : [],
+      tileCount: pop ? pop.querySelectorAll('.dshs-tile').length : 0,
       search: Boolean(pop?.querySelector('input')),
-      activeElement: document.activeElement?.className,
+      popBox: pop ? pop.getBoundingClientRect().toJSON() : null,
+      rowBox: row ? row.getBoundingClientRect().toJSON() : null,
+      expanded: row?.getAttribute('aria-expanded'),
     };
   });
-  check('shelf opens', opened.found);
-  check('shelf lists every panel', opened.tiles.length >= 3, `${opened.tiles.length} tiles`);
+  check('shelf opens from the native row', opened.found);
+  check('shelf lists every panel', opened.tileCount === 12, `${opened.tileCount} tiles`);
+  check('card opens under the row', opened.popBox !== null && opened.popBox.top >= opened.rowBox.bottom);
   check('search appears for many panels', opened.search);
-  check('no tile pre-highlighted', await page.evaluate(() => document.querySelector('.dshs-tile[data-focus="true"]') === null));
   await page.screenshot({ path: path.join(outDir, '02-shelf-open.png') });
 
   // 3. search + keyboard + open a panel
@@ -88,6 +101,7 @@ function check(name, ok, detail) {
   await sleep(150);
   const highlighted = await page.evaluate(() => document.querySelector('.dshs-tile[data-focus="true"]')?.getAttribute('title'));
   check('arrow key highlights a tile', Boolean(highlighted), String(highlighted));
+
   await page.keyboard.press('Enter');
   await sleep(600);
   const afterOpen = await page.evaluate(() => ({
@@ -99,36 +113,40 @@ function check(name, ok, detail) {
   await page.screenshot({ path: path.join(outDir, '03-panel-opened.png') });
 
   // 4. reopened shelf marks the active panel
-  await page.evaluate(() => document.querySelector('.dshs-trigger').click());
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
   await sleep(400);
   const active = await page.evaluate(() => {
-    const tile = document.querySelector('.dshs-tile[data-active="true"]');
-    return { title: tile?.getAttribute('title'), count: document.querySelectorAll('.dshs-tile[data-active="true"]').length };
+    const tiles = [...document.querySelectorAll('.dshs-tile[data-active="true"]')];
+    return { count: tiles.length, title: tiles[0]?.getAttribute('title') };
   });
   check('active panel is marked in the shelf', active.count === 1, String(active.title));
-  await page.screenshot({ path: path.join(outDir, '04-active.png') });
 
   // 5. Escape closes
   await page.keyboard.press('Escape');
   await sleep(250);
   check('Escape closes the shelf', await page.evaluate(() => document.querySelector('.dshs-pop') === null));
 
-  // 6. rail mode
+  // 6. rail mode keeps the same native row, as a 36px icon
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === '收起侧边栏');
     if (btn) btn.click();
   });
   await sleep(700);
   const rail = await page.evaluate(() => {
-    const t = document.querySelector('.dshs-trigger');
-    const r = t.getBoundingClientRect();
-    return { width: Math.round(r.width), height: Math.round(r.height), labelVisible: Boolean(document.querySelector('.dshs-trigger-label')) };
+    const row = document.querySelector('[data-dsh-shelf-row]');
+    const r = row.getBoundingClientRect();
+    return { width: Math.round(r.width), height: Math.round(r.height), label: row.textContent.trim() };
   });
-  check('rail trigger shrinks to an icon', rail.width === 36 && rail.height === 36, JSON.stringify(rail));
-  await page.evaluate(() => document.querySelector('.dshs-trigger').click());
+  check('rail row shrinks to a 36px icon', rail.width === 36 && rail.height === 36, JSON.stringify(rail));
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
   await sleep(400);
+  const railPop = await page.evaluate(() => {
+    const pop = document.querySelector('.dshs-pop');
+    const row = document.querySelector('[data-dsh-shelf-row]');
+    return { open: Boolean(pop), left: pop?.getBoundingClientRect().left, rowRight: row?.getBoundingClientRect().right };
+  });
+  check('rail shelf opens beside the rail', railPop.open && railPop.left >= railPop.rowRight, JSON.stringify(railPop));
   await page.screenshot({ path: path.join(outDir, '05-rail.png') });
-  check('shelf opens in rail mode', await page.evaluate(() => Boolean(document.querySelector('.dshs-pop'))));
 
   // 7. dark theme in a fresh page that prefers dark
   const dark = await browser.newPage();
@@ -136,18 +154,13 @@ function check(name, ok, detail) {
   await dark.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
   await dark.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
   await sleep(3000);
-  await dark.evaluate(() => {
-    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '继续');
-    if (btn) btn.click();
-    document.querySelector('[role="dialog"] button[aria-label="关闭"]')?.click();
-  });
-  await sleep(600);
+  await dismissDialogs(dark);
   const darkTheme = await dark.evaluate(() => ({
     isDark: document.body.hasAttribute('data-ds-dark-theme'),
-    trigger: Boolean(document.querySelector('.dshs-trigger')),
+    row: Boolean(document.querySelector('[data-dsh-shelf-row]')),
   }));
-  check('dark theme renders the shelf', darkTheme.trigger, `data-ds-dark-theme=${darkTheme.isDark}`);
-  await dark.evaluate(() => document.querySelector('.dshs-trigger').click());
+  check('dark theme renders the shelf row', darkTheme.row, `data-ds-dark-theme=${darkTheme.isDark}`);
+  await dark.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
   await sleep(400);
   await dark.screenshot({ path: path.join(outDir, '06-dark.png') });
 
