@@ -58,16 +58,16 @@ DSH's left sidebar is owned by `@deepseek-ai/dsh-client-ui-sidebar`. Third-party
 | Contract | Use |
 | --- | --- |
 | `sidebar.panellist` slot (root scope, list) | Every panel registers an icon component with `id` / `order` / `label`. The shelf registers one entry of its own here (`order: -1000`) and reads the rest of the registry as its data source. |
-| The registered row's DOM | The shell wraps our icon in its own `<button class="panelRow">`. From the glyph we find that button, mark it `data-dsh-shelf-row` and intercept its click in the capture phase. |
+| The registered row's DOM | The shell wraps our icon in its own row: a `<button class="panelRow">` directly inside `<nav>` on DSH 0.2.1, wrapped in a `.panelEntry` div on 0.2.2. The plugin marks the nav child and the button separately, then intercepts the button's click in the capture phase. |
 | `ctx.layout.selectPanel(id)` | The official way to open a panel; the shelf never fakes a click on another row. |
 | `ctx.layout.panelInfo` | The selected-panel source, used for the active marker inside the shelf. |
 
 Concretely, `lib/client.js`:
 
 1. registers its own `sidebar.panellist` entry (`id: dsh-sidebar-shelf-entry`, `order: -1000`, label `面板` / `Panels`);
-2. from its glyph walks to the shell's row button, marks it, and attaches a capture-phase click handler — this both opens the shelf and stops the shell from calling `selectPanel` on an id that has no main panel;
-3. hides the sibling rows with one scoped rule: `[data-dsh-shelf="on"] > nav > *:not([data-dsh-shelf-row]) { display: none !important }` — the list element itself stays mounted, so the row keeps the shell's native position, spacing and rail geometry;
-4. also watches the sidebar root for rows injected by other plugins (`data-dsh-*-entry`), hides them in place and lists them at the top of the shelf with their own icon, label and `data-active` state; choosing one calls that row's own `click()`;
+2. from its glyph walks to the shell's row button and to the row's direct child of `<nav>` (the button itself on 0.2.1, the `.panelEntry` wrapper on 0.2.2), marks both, and attaches a capture-phase click handler — this both opens the shelf and stops the shell from calling `selectPanel` on an id that has no main panel;
+3. hides the sibling entries with one scoped rule on the list: `[data-dsh-shelf="on"] > *:not([data-dsh-shelf-row]) { display: none !important }` — the list element itself stays mounted, so the row keeps the shell's native position, spacing and rail geometry;
+4. also watches every ancestor level of the panel list for rows injected by other plugins (`data-dsh-*-entry`), hides them in place and lists them at the top of the shelf with their own icon, label and `data-active` state; choosing one calls that row's own `click()`;
 5. reads `ctx.slots.entriesOfSlot("sidebar.panellist")` for the remaining shelf contents, mirrors the sidebar's own sort (`order`, then registration order), and renders each panel's **own** icon component (wrapped in an error boundary that falls back to an initial);
 6. calls `ctx.layout.selectPanel(id)` when a registered panel tile is chosen.
 
@@ -75,7 +75,7 @@ Nothing else is touched: no workspace rows, no brand row, no Settings, no host-s
 
 ## Verified
 
-- DSH `0.2.1-rc.3`, Windows, Chromium 1440×900 — 23/23 end-to-end checks: placement above the workspace, sibling-only hiding, search, keyboard, panel switching, active marker, Escape, adoption of a DOM-injected `data-dsh-*-entry` row (hidden in place, listed first, own click handler runs, active state reflected), 56px rail, dark theme, no page errors.
+- DSH `0.2.1-rc.3` **and** `0.2.2-rc.3`, Windows, Chromium 1440×900 — 23/23 end-to-end checks on each: placement above the workspace, sibling-only hiding, search, keyboard, panel switching, active marker, Escape, adoption of a DOM-injected `data-dsh-*-entry` row (hidden in place, listed first, own click handler runs, active state reflected), 56px rail, dark theme, no page errors.
 - `node test/smoke.mjs` — 10 manifest/bundle/wiring checks, no dependencies.
 
 The screenshots above were produced by `test/e2e.cjs` against a throwaway profile; the panels in them come from a test-only fixture (`test/demo-panels`), not from shipped code.

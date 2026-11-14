@@ -58,16 +58,16 @@ DSH 的左侧栏由 `@deepseek-ai/dsh-client-ui-sidebar` 拥有。第三方插�
 | 契约 | 用途 |
 | --- | --- |
 | `sidebar.panellist` 槽（root 作用域，list） | 每个面板在这里注册 `id` / `order` / `label` 和图标组件。收纳架自己也在这里注册一行（`order: -1000`），其余注册项就是它的数据源。 |
-| 注册行所在的 DOM | 外壳把我们的图标包进它自己的 `<button class="panelRow">`。我们从图标向上找到这个按钮，标记 `data-dsh-shelf-row`，并在捕获阶段拦截它的点击。 |
+| 注册行所在的 DOM | 外壳把我们的图标包进它自己的行：0.2.1 是 `<nav>` 里直接一个 `<button class="panelRow">`，0.2.2 外面多了一层 `.panelEntry` div。插件分别标记 `<nav>` 的直接子行和按钮，并在捕获阶段拦截按钮的点击。 |
 | `ctx.layout.selectPanel(id)` | 官方选中面板的方式；收纳架从不伪造点击别的行。 |
 | `ctx.layout.panelInfo` | 当前选中面板，用于收纳架里的「当前」标记。 |
 
 具体到 `lib/client.js`：
 
 1. 在 `sidebar.panellist` 注册自己的一行（`id: dsh-sidebar-shelf-entry`、`order: -1000`、label `面板` / `Panels`）；
-2. 从图标向上找到外壳的面板行按钮，打标记，并挂捕获阶段的 click 处理器——既打开收纳架，也阻止外壳对一个没有主面板的 id 调用 `selectPanel`；
-3. 用一条作用域受限的规则隐藏兄弟行：`[data-dsh-shelf="on"] > nav > *:not([data-dsh-shelf-row]) { display: none !important }`——列表元素本身保持挂载，所以这一行保留外壳原生的位置、间距和轨道几何；
-4. 同时观察侧栏根节点里由其它插件注入的行（`data-dsh-*-entry`），原地隐藏并放到收纳架最前面，图标、标签、`data-active` 激活态都跟随原行；点它时触发原行自己的 `click()`；
+2. 从图标向上找到外壳的面板行按钮，以及该行在 `<nav>` 里的直接子元素（0.2.1 就是按钮本身，0.2.2 是 `.panelEntry` 包装层），分别打标记，并挂捕获阶段的 click 处理器——既打开收纳架，也阻止外壳对一个没有主面板的 id 调用 `selectPanel`；
+3. 用一条作用域受限的规则隐藏兄弟条目：`[data-dsh-shelf="on"] > *:not([data-dsh-shelf-row]) { display: none !important }`——列表元素本身保持挂载，所以这一行保留外壳原生的位置、间距和轨道几何；
+4. 同时观察面板列表的每一层祖先，把其它插件注入的行（`data-dsh-*-entry`）原地隐藏并放到收纳架最前面，图标、标签、`data-active` 激活态都跟随原行；点它时触发原行自己的 `click()`；
 5. 读 `ctx.slots.entriesOfSlot("sidebar.panellist")` 作为收纳架其余内容，复刻侧栏自己的排序（`order`，再按注册顺序），每格直接用面板**自己注册的图标组件**（外层错误边界，失败时退回首字母）；
 6. 选中已注册面板时调用 `ctx.layout.selectPanel(id)`。
 
@@ -75,7 +75,7 @@ DSH 的左侧栏由 `@deepseek-ai/dsh-client-ui-sidebar` 拥有。第三方插�
 
 ## 已验证
 
-- DSH `0.2.1-rc.3` / Windows / Chromium 1440×900 —— 23/23 端到端检查：入口位于工作区上方、只隐藏兄弟行、搜索、键盘、切换面板、当前标记、Esc、收养 DOM 注入的 `data-dsh-*-entry` 行（原地隐藏、排在最前、原点击处理器仍执行、激活态同步）、56px 轨道、暗色主题、无页面报错。
+- DSH `0.2.1-rc.3` **与** `0.2.2-rc.3` / Windows / Chromium 1440×900 —— 两个版本各 23/23 端到端检查：入口位于工作区上方、只隐藏兄弟条目、搜索、键盘、切换面板、当前标记、Esc、收养 DOM 注入的 `data-dsh-*-entry` 行（原地隐藏、排在最前、原点击处理器仍执行、激活态同步）、56px 轨道、暗色主题、无页面报错。
 - `node test/smoke.mjs` —— 10 项清单 / bundle / 接线检查，零依赖。
 
 上面的截图由 `test/e2e.cjs` 在一次性测试 profile 里产生；截图里的面板来自仅用于测试的 fixture（`test/demo-panels`），不随包发布。

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2 — 2026-11-14
+
+- **Support DSH 0.2.2.** The sidebar now nests the panel list under `scrollRegion > scrollArea` and wraps every row in a `.panelEntry` div. The plugin no longer assumes the row button is a direct child of `<nav>`: it marks the nav child (button on 0.2.1, wrapper on 0.2.2) and the trigger button separately, and scopes the hide rule to the list element. This fixes "panels are no longer collapsed" after the 0.2.2 update.
+- Hide the extra unpin control 0.2.2 adds inside our own row, so the shelf entry cannot be accidentally unpinned and leave the column empty.
+- Injected `data-dsh-*-entry` rows are now discovered across every ancestor level of the panel list (0.2.2 moved the list two levels deeper).
+- Verified 23/23 on both `0.2.1-rc.3` and `0.2.2-rc.3`.
+
 ## 0.2.1 — 2026-11-03
 
 - **Adopt DOM-injected sidebar rows.** Plugins that bypass `sidebar.panellist` and inject a row into the sidebar root (the `data-dsh-*-entry` convention used by `dsh-webchat`, taskboard and ssh) are now hidden in place and listed at the top of the shelf with their own icon, label and `data-active` state. Choosing one calls that row's own `click()`, so its toggle/panel logic keeps working.

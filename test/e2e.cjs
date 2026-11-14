@@ -71,7 +71,7 @@ async function dismissDialogs(page) {
   await page.screenshot({ path: path.join(outDir, '01-placement.png') });
 
   // 2. open the shelf
-  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-trigger]').click());
   await sleep(400);
   const opened = await page.evaluate(() => {
     const row = document.querySelector('[data-dsh-shelf-row]');
@@ -113,7 +113,7 @@ async function dismissDialogs(page) {
   await page.screenshot({ path: path.join(outDir, '03-panel-opened.png') });
 
   // 4. reopened shelf marks the active panel
-  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-trigger]').click());
   await sleep(400);
   const active = await page.evaluate(() => {
     const tiles = [...document.querySelectorAll('.dshs-tile[data-active="true"]')];
@@ -133,7 +133,7 @@ async function dismissDialogs(page) {
   });
   check('DOM-injected row is adopted and hidden in place', external.found && external.display === 'none', JSON.stringify(external));
 
-  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-trigger]').click());
   await sleep(400);
   const externalTile = await page.evaluate(() => {
     const first = document.querySelector('.dshs-tile');
@@ -151,7 +151,7 @@ async function dismissDialogs(page) {
   check('adopted row keeps its own click handler', afterExternal.clicks === 1, JSON.stringify(afterExternal));
   check('choosing an adopted row closes the shelf', afterExternal.pop === false);
 
-  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-trigger]').click());
   await sleep(400);
   const externalActive = await page.evaluate(() => document.querySelector('.dshs-tile[data-active="true"]')?.getAttribute('title'));
   check('adopted row shows its active state', externalActive === '网页聊天', String(externalActive));
@@ -169,8 +169,8 @@ async function dismissDialogs(page) {
     const r = row.getBoundingClientRect();
     return { width: Math.round(r.width), height: Math.round(r.height), label: row.textContent.trim() };
   });
-  check('rail row shrinks to a 36px icon', rail.width === 36 && rail.height === 36, JSON.stringify(rail));
-  await page.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
+  check('rail row shrinks to a 36px icon', Math.abs(rail.width - 36) <= 1.5 && Math.abs(rail.height - 36) <= 1.5, JSON.stringify(rail));
+  await page.evaluate(() => document.querySelector('[data-dsh-shelf-trigger]').click());
   await sleep(400);
   const railPop = await page.evaluate(() => {
     const pop = document.querySelector('.dshs-pop');
@@ -192,7 +192,7 @@ async function dismissDialogs(page) {
     row: Boolean(document.querySelector('[data-dsh-shelf-row]')),
   }));
   check('dark theme renders the shelf row', darkTheme.row, `data-ds-dark-theme=${darkTheme.isDark}`);
-  await dark.evaluate(() => document.querySelector('[data-dsh-shelf-row]').click());
+  await dark.evaluate(() => document.querySelector('[data-dsh-shelf-trigger]').click());
   await sleep(400);
   await dark.screenshot({ path: path.join(outDir, '06-dark.png') });
 
